@@ -1,0 +1,36 @@
+#!/usr/bin/env python3
+"""Remove pages from a PDF."""
+import argparse
+from pathlib import Path
+
+from pypdf import PdfReader, PdfWriter
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("infile", help="PDF to prune.")
+    parser.add_argument("-o", "--outfile", help="Name of pruned PDF output.")
+    args = parser.parse_args()
+
+    reader = PdfReader(args.infile)
+    writer = PdfWriter()
+
+    # zero-indexed
+    prune_pages = set([0])
+
+    # add all pages to the writer and rotate them
+    for i in range(len(reader.pages)):
+        if i not in prune_pages:
+            writer.add_page(reader.pages[i])
+
+    if args.outfile is None:
+        outfile = str(Path(args.infile).stem) + "_pruned.pdf"
+    else:
+        outfile = args.outfile
+
+    with open(outfile, "wb") as fp:
+        writer.write(fp)
+    print(f"Saved pruned PDF to {outfile}.")
+
+
+main()
