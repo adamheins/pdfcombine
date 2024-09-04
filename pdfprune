@@ -6,21 +6,51 @@ from pathlib import Path
 from pypdf import PdfReader, PdfWriter
 
 
+def parse_page_range(s, zero_index=True):
+    pages = set()
+    ranges = s.split(",")
+    for r in ranges:
+        limits = r.split("-")
+        if len(limits) == 1:
+            pages.add(int(limits[0]))
+        elif len(limits) == 2:
+            low = int(limits[0])
+            high = int(limits[1])
+            if high < low:
+                raise ValueError(f"Invalid range: {r}")
+            pages.update(range(low, high + 1))
+        else:
+            raise ValueError(f"Failed to parse page range: {s}")
+
+    if zero_index:
+        pages = set([p - 1 for p in pages])
+    return pages
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("infile", help="PDF to prune.")
+    parser.add_argument("pages", help="Pages to remove.")
+    parser.add_argument(
+        "-k",
+        "--keep",
+        help="Keep only the specified pages instead of removing them.",
+        action="store_true",
+    )
     parser.add_argument("-o", "--outfile", help="Name of pruned PDF output.")
     args = parser.parse_args()
 
     reader = PdfReader(args.infile)
     writer = PdfWriter()
 
-    # zero-indexed
-    prune_pages = set([0])
+    pages_to_prune = parse_page_range(args.pages)
+    if args.keep:
+        all_pages = set(range(len(reader.pages)))
+        pages_to_prune = all_pages - pages_to_prune
 
     # add all pages to the writer and rotate them
     for i in range(len(reader.pages)):
-        if i not in prune_pages:
+        if i not in pages_to_prune:
             writer.add_page(reader.pages[i])
 
     if args.outfile is None:
