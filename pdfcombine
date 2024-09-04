@@ -1,0 +1,113 @@
+#!/usr/bin/env python3
+"""Remove pages from a PDF."""
+import sys
+
+from pypdf import PdfReader, PdfWriter
+
+
+USAGE = """combine (parts of) PDF files
+
+usage: pdfcombine file1 [--keep | --remove range] file2 [--keep | --remove range] ...
+
+examples:
+    # extract first two pages and fourth page of foo.pdf
+    pdfcombine foo.pdf --keep 1-2,4
+
+    # combine first two pages of foo.pdf with all but the first two pages of
+    # bar.pdf
+    pdfcombine foo.pdf --keep 1-2 bar.pdf --remove 1-2
+"""
+
+
+def parse_page_range(s, zero_index=True):
+    pages = set()
+    ranges = s.split(",")
+    for r in ranges:
+        limits = r.split("-")
+        if len(limits) == 1:
+            pages.add(int(limits[0]))
+        elif len(limits) == 2:
+            low = int(limits[0])
+            high = int(limits[1])
+            if high < low:
+                raise ValueError(f"invalid range: {r}")
+            pages.update(range(low, high + 1))
+        else:
+            raise ValueError(f"failed to parse page range: {s}")
+
+    if zero_index:
+        pages = set([p - 1 for p in pages])
+    return pages
+
+
+class Operation:
+    def __init__(self, filename, page_range=None, keep=True):
+        self.filename = filename
+        self.page_range = page_range
+        self.keep = keep
+
+    def __repr__(self):
+        return f"Operation(filename={self.filename}, page_range={self.page_range}, keep={self.keep})"
+
+    def pages_to_keep(self, N):
+        all_pages = set(range(N))
+        if self.page_range is None:
+            return all_pages
+
+        pages = parse_page_range(self.page_range)
+        if self.keep:
+            return pages
+        return all_pages - pages
+
+
+def main():
+    args_to_process = sys.argv[1:].copy()
+
+    if (
+        len(args_to_process) == 0
+        or "-h" in args_to_process
+        or "--help" in args_to_process
+    ):
+        print(USAGE)
+        return
+
+    operations = []
+    while len(args_to_process) > 0:
+        last_file = args_to_process.pop(0)
+        if len(args_to_process) > 0 and args_to_process[0].startswith("-"):
+            cmd = args_to_process.pop(0)
+            page_range = args_to_process.pop(0)
+
+            if cmd == "-k" or cmd == "--keep":
+                keep = True
+            elif cmd == "-r" or cmd == "--remove":
+                keep = False
+            else:
+                print(f"error: failed to parse argument: {current}")
+                return
+            operation = Operation(filename=last_file, page_range=page_range, keep=keep)
+        else:
+            operation = Operation(filename=last_file)
+        operations.append(operation)
+
+    writer = PdfWriter()
+    for op in operations:
+        reader = PdfReader(op.filename)
+        try:
+            pages_to_keep = op.pages_to_keep(len(reader.pages))
+        except ValueError as e:
+            print(f"error: {e}")
+            return
+
+        # add all pages to the writer
+        for i in range(len(reader.pages)):
+            if i in pages_to_keep:
+                writer.add_page(reader.pages[i])
+
+    outfile = "combined.pdf"
+    with open(outfile, "wb") as fp:
+        writer.write(fp)
+    print(f"Saved pruned PDF to {outfile}.")
+
+
+main()
