@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Remove pages from a PDF."""
+"""Flexibly combine (parts of) PDF files."""
+from collections import deque
+import os
 import sys
 
 from pypdf import PdfReader, PdfWriter
@@ -7,7 +9,7 @@ from pypdf import PdfReader, PdfWriter
 
 USAGE = """combine (parts of) PDF files
 
-usage: pdfcombine file1 [--keep | --remove range] file2 [--keep | --remove range] ...
+usage: pdfcombine file1 [--keep | --remove range] file2 [--keep | --remove range] ... [-o output]
 
 examples:
     # extract first two pages and fourth page of foo.pdf
@@ -17,6 +19,63 @@ examples:
     # bar.pdf
     pdfcombine foo.pdf --keep 1-2 bar.pdf --remove 1-2
 """
+
+
+def _get_range_end(current_idx, values):
+    end_idx = current_idx
+    while end_idx + 1 < len(values) and values[end_idx + 1] == values[end_idx] + 1:
+        end_idx += 1
+    return end_idx
+
+
+# NOTE: basically the same functionality as https://github.com/taylorzr/PageRange
+class PageRange:
+    def __init__(self, pages):
+        self.pages = set(pages)
+
+    def __repr__(self):
+        return f"PageRange({self.to_string()})"
+
+    @classmethod
+    def from_string(cls, s):
+        pages = set()
+        ranges = s.split(",")
+        for r in ranges:
+            limits = r.split("-")
+            if len(limits) == 1:
+                pages.add(int(limits[0]))
+            elif len(limits) == 2:
+                low = int(limits[0])
+                high = int(limits[1])
+                if high < low:
+                    raise ValueError(f"invalid range: {r}")
+                pages.update(range(low, high + 1))
+            else:
+                raise ValueError(f"failed to parse page range: {s}")
+
+        # zero-indexed
+        pages = set([p - 1 for p in pages])
+        return cls(pages)
+
+    def to_string(self):
+        if len(self.pages) == 0:
+            return ""
+
+        pages = list(dict.fromkeys(self.pages))
+        current_idx = 0
+        tokens = []
+        while current_idx < len(pages):
+            tokens.append(str(pages[current_idx]))
+            end_idx = _get_range_end(current_idx, pages)
+            if end_idx <= current_idx + 1:
+                current_idx += 1
+            else:
+                tokens.append("-")
+                tokens.append(str(pages[end_idx]))
+                current_idx = end_idx + 1
+            if current_idx < len(pages):
+                tokens.append(",")
+        return "".join(tokens)
 
 
 def parse_page_range(s, zero_index=True):
@@ -71,9 +130,25 @@ def main():
         print(USAGE)
         return
 
+    # parse combined output file name
+    outfile = "combined.pdf"
+    if "-o" in args_to_process:
+        idx = args_to_process.index("-o")
+        outfile = args_to_process.pop(idx + 1)
+        args_to_process.pop(idx)
+    if os.path.exists(outfile):
+        print(f"Output file {outfile} already exists. Aborting.")
+        return
+
+    # parse operations to perform
+    # TODO should do more checking here
     operations = []
     while len(args_to_process) > 0:
         last_file = args_to_process.pop(0)
+        if not os.path.isfile(last_file):
+            print(f"File {last_file} does not exist. Aborting.")
+            return
+
         if len(args_to_process) > 0 and args_to_process[0].startswith("-"):
             cmd = args_to_process.pop(0)
             page_range = args_to_process.pop(0)
@@ -83,13 +158,14 @@ def main():
             elif cmd == "-r" or cmd == "--remove":
                 keep = False
             else:
-                print(f"error: failed to parse argument: {current}")
+                print(f"Error: failed to parse argument: {current}")
                 return
             operation = Operation(filename=last_file, page_range=page_range, keep=keep)
         else:
             operation = Operation(filename=last_file)
         operations.append(operation)
 
+    # combine the PDFs
     writer = PdfWriter()
     for op in operations:
         reader = PdfReader(op.filename)
@@ -104,10 +180,9 @@ def main():
             if i in pages_to_keep:
                 writer.add_page(reader.pages[i])
 
-    outfile = "combined.pdf"
     with open(outfile, "wb") as fp:
         writer.write(fp)
-    print(f"Saved pruned PDF to {outfile}.")
+    print(f"Saved combined PDF to {outfile}.")
 
 
 main()
