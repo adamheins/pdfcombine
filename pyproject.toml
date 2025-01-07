@@ -7,6 +7,7 @@ version = "0.1"
 description = "A simple command line tool for splitting, merging, and rotating PDF files."
 authors = ["Adam Heins <mail@adamheins.com>"]
 readme = "README.md"
+license = {file = "LICENSE"}
 
 [tool.poetry.dependencies]
 python = ">=3.8,<3.12"

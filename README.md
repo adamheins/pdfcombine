@@ -40,3 +40,7 @@ pdfcombine foo.pdf --keep 1-2 bar.pdf --remove 1-2 -o out.pdf
 # bar.pdf
 pdfcombine foo.pdf --keep 1 --angle 90 bar.pdf --keep 2 -o out.pdf
 ```
+
+## License
+
+MIT
