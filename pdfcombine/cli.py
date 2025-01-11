@@ -32,6 +32,23 @@ Examples:
 
 
 class Operation:
+    """An operation to perform on a PDF file.
+
+    Includes pages to keep or remove, and rotation.
+
+    Parameters
+    ----------
+    filename : str
+        The name of the file.
+    page_range : str or None
+        The range of pages to keep or remove.
+    keep : bool
+        True means keep (only) the specified pages. False means remove the
+        specified pages (leaving all others).
+    angle : int
+        The angle to rotate the pages, in degrees.
+    """
+
     def __init__(self, filename, page_range=None, keep=True, angle=0):
         self.filename = filename
         self.page_range = page_range
@@ -44,6 +61,7 @@ class Operation:
         return f"Operation(filename={self.filename}, page_range={self.page_range}, keep={self.keep})"
 
     def pages_to_keep(self, N):
+        """The set of pages of the PDF to keep."""
         all_pages = set(range(N))
         if self.page_range is None:
             return all_pages
@@ -60,6 +78,7 @@ def highlight(s):
 
 
 def parse_page_range(s, zero_index=True):
+    """Convert a string representing a page range to a set of pages."""
     pages = set()
     ranges = s.split(",")
     for r in ranges:
@@ -81,6 +100,7 @@ def parse_page_range(s, zero_index=True):
 
 
 def parse_output_file(args):
+    """Parse the output file out of the argument list."""
     try:
         idx_o = args.index("-o")
     except ValueError:

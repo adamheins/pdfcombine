@@ -12,10 +12,10 @@ pipx install git+https://github.com/adamheins/pdfcombine.git
 
 ## Usage
 
-The basic idea is that the user can specify any number of input PDFs and
+The basic idea is that the user can provide any number of input PDFs and
 specify which pages to keep or remove from them. The result is then merged and
-output as a single file. Each input can optionally be rotated and can inputs
-can be repeated. Usage:
+output as a single file. Each input file's pages can optionally be rotated and
+inputs can be repeated. Usage:
 ```
 pdfcombine input1.pdf [--keep range | --remove range] [--angle degrees] \
           [input2.pdf [...]] ... [-o output.pdf]
